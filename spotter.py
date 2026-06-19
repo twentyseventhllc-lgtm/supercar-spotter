@@ -50,6 +50,7 @@ def save_catch(out_dir, frame, action):
         csv.writer(fh).writerow([ts, action.track_id, action.label,
                                  f"{action.confidence:.3f}", path])
     print(f"📸 caught {action.label} ({action.confidence:.0%}) → {path}")
+    return path
 
 
 def run():

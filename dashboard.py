@@ -22,6 +22,7 @@ from ultralytics import YOLO
 
 from brain import BrandClassifier, pick_best
 from catch import CatchTracker
+from notify import notify_catch
 from spotter import (BRANDS, NEGATIVES, MARGIN, MIN_CONFIDENCE,
                      MIN_BOX_AREA, CONF, OUT_DIR, save_catch, list_sources)
 
@@ -153,11 +154,12 @@ def _process_frame(result, mode, classifier, tracker, state):
             continue
         action = tracker.update(tid, verdict)
         if action is not None:
-            save_catch(OUT_DIR, annotated, action)
+            path = save_catch(OUT_DIR, annotated, action)
             state["caught_ids"].add(tid)
             state["last"] = action.label
             state["thumbs"].append((crop.copy(), action.label))
             state["thumbs"] = state["thumbs"][-12:]
+            notify_catch(action, path)   # one phone push per car (self-throttled)
 
     return annotated
 
