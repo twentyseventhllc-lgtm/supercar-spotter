@@ -47,9 +47,28 @@ def _build_request(topic, title, message, image_bytes, filename,
     )
 
 
+def _shrink_for_push(image_path, max_side=800, quality=70):
+    """Downscale + recompress so the attachment stays well under ntfy's size
+    limit — full-res catch frames (1920x1080) trigger HTTP 413. Falls back to the
+    raw file bytes if the image can't be decoded/encoded."""
+    import cv2
+    img = cv2.imread(image_path)
+    if img is None:
+        with open(image_path, "rb") as fh:
+            return fh.read()
+    h, w = img.shape[:2]
+    scale = max_side / max(h, w)
+    if scale < 1.0:
+        img = cv2.resize(img, (max(1, int(w * scale)), max(1, int(h * scale))))
+    ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    if not ok:
+        with open(image_path, "rb") as fh:
+            return fh.read()
+    return buf.tobytes()
+
+
 def ntfy_photo(topic, title, message, image_path, timeout=10):
-    with open(image_path, "rb") as fh:
-        image_bytes = fh.read()
+    image_bytes = _shrink_for_push(image_path)
     req = _build_request(topic, title, message, image_bytes,
                          os.path.basename(image_path))
     urllib.request.urlopen(req, timeout=timeout)

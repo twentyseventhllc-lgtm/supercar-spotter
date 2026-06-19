@@ -67,6 +67,21 @@ def test_notify_catch_rate_limited_by_cooldown(monkeypatch):
     assert sent == ["Lamborghini 94%", "Porsche 80%"]
 
 
+def test_shrink_for_push_reduces_dimensions_and_size(tmp_path):
+    # Full-res catch frames trigger ntfy's 413; the push image must be downscaled.
+    import cv2
+    import numpy as np
+    big = np.random.randint(0, 255, (1080, 1920, 3), dtype=np.uint8)
+    path = tmp_path / "big.jpg"
+    cv2.imwrite(str(path), big)
+    raw = path.read_bytes()
+
+    out = notify._shrink_for_push(str(path), max_side=800, quality=70)
+    decoded = cv2.imdecode(np.frombuffer(out, np.uint8), cv2.IMREAD_COLOR)
+    assert max(decoded.shape[:2]) <= 800       # downscaled
+    assert len(out) < len(raw)                 # smaller payload
+
+
 def test_notify_catch_noop_when_disabled(monkeypatch):
     notify._notified.clear()
     monkeypatch.setattr(notify, "ENABLED", False)
