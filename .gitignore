@@ -13,3 +13,6 @@ clips/
 
 # OS
 .DS_Store
+
+# SDD scratch
+.superpowers/
