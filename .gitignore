@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# YOLO auto-downloaded weights
+*.pt
+
+# Runtime output
+catches/
+clips/
+
+# OS
+.DS_Store
