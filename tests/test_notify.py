@@ -24,8 +24,10 @@ def test_build_request_strips_non_ascii_from_headers():
 
 def test_notify_catch_pushes_once_per_track(monkeypatch):
     notify._notified.clear()
+    monkeypatch.setattr(notify, "_last_push_ts", None)
     monkeypatch.setattr(notify, "ENABLED", True)
     monkeypatch.setattr(notify, "NTFY_TOPIC", "t")
+    monkeypatch.setattr(notify, "NOTIFY_COOLDOWN", 0)   # isolate the per-track dedup
     sent = []
     monkeypatch.setattr(notify, "ntfy_photo",
                         lambda topic, title, msg, path: sent.append((title, path)))
@@ -41,6 +43,28 @@ def test_notify_catch_pushes_once_per_track(monkeypatch):
 
     assert sent == [("Lamborghini 94%", "catches/a.jpg"),
                     ("Porsche 80%", "catches/c.jpg")]
+
+
+def test_notify_catch_rate_limited_by_cooldown(monkeypatch):
+    # The flood-protection: at most one push per NOTIFY_COOLDOWN seconds. A car
+    # blocked by the cooldown is NOT marked done, so it can still push once the
+    # window clears (we don't lose it forever).
+    notify._notified.clear()
+    monkeypatch.setattr(notify, "_last_push_ts", None)
+    monkeypatch.setattr(notify, "ENABLED", True)
+    monkeypatch.setattr(notify, "NTFY_TOPIC", "t")
+    monkeypatch.setattr(notify, "NOTIFY_COOLDOWN", 60)
+    sent = []
+    monkeypatch.setattr(notify, "ntfy_photo",
+                        lambda topic, title, msg, path: sent.append(title))
+
+    first = CatchAction(track_id=7, label="Lamborghini", confidence=0.94)
+    later = CatchAction(track_id=8, label="Porsche", confidence=0.80)
+    assert notify.notify_catch(first, "a.jpg", now=0) is True     # first push
+    assert notify.notify_catch(later, "b.jpg", now=10) is False   # within cooldown -> dropped
+    assert notify.notify_catch(later, "b.jpg", now=70) is True    # cooldown cleared -> sends
+
+    assert sent == ["Lamborghini 94%", "Porsche 80%"]
 
 
 def test_notify_catch_noop_when_disabled(monkeypatch):
