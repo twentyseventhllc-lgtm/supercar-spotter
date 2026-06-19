@@ -61,6 +61,7 @@ class BrandClassifier:
                 if device == "cpu":
                     raise
                 print(f"({device} unavailable for CLIP: {exc}; falling back)")
+        print(f"(CLIP running on {self.device})")
 
     @staticmethod
     def _candidate_devices(torch):
