@@ -27,3 +27,20 @@ def test_no_negatives_present_uses_zero_floor():
     scores = {"Ferrari": 0.3}
     v = pick_best(scores, BRANDS, NEGS, margin=0.15)
     assert v.is_supercar is True
+
+def test_below_confidence_floor_not_caught():
+    # Beats the margin handily, but a weak 0.6 brand score is a blurry-car guess.
+    scores = {"Ferrari": 0.6, "ordinary car": 0.1}
+    v = pick_best(scores, BRANDS, NEGS, margin=0.15, min_confidence=0.70)
+    assert v.label == "Ferrari" and v.confidence == 0.6 and v.is_supercar is False
+
+def test_above_confidence_floor_is_caught():
+    scores = {"Ferrari": 0.8, "ordinary car": 0.1}
+    v = pick_best(scores, BRANDS, NEGS, margin=0.15, min_confidence=0.70)
+    assert v.label == "Ferrari" and v.is_supercar is True
+
+def test_floor_defaults_to_zero_preserving_old_behavior():
+    # Without min_confidence, a low-but-margin-beating brand still catches.
+    scores = {"Ferrari": 0.3, "ordinary car": 0.05}
+    v = pick_best(scores, BRANDS, NEGS, margin=0.15)
+    assert v.is_supercar is True

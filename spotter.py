@@ -5,6 +5,7 @@ BRANDS     = ["Ferrari", "Lamborghini", "Porsche", "McLaren", "Lotus",
               "Aston Martin", "Bugatti", "Maserati", "Audi R8", "Corvette"]
 NEGATIVES  = ["ordinary car", "sedan", "SUV", "van", "truck"]
 MARGIN     = 0.15      # how much a brand must beat the best normie score to count
+MIN_CONFIDENCE = 0.70  # absolute brand confidence floor; kills weak/blurry false alarms
 MIN_BOX_AREA = 4000    # px²; skip tiny far-away cars
 CONF       = 0.30      # YOLO detection confidence floor
 CAR_CLASSES = [2]      # COCO 'car'
@@ -76,7 +77,8 @@ def run():
                 if crop.size == 0:
                     continue
 
-                verdict = pick_best(classifier.score(crop), BRANDS, NEGATIVES, MARGIN)
+                verdict = pick_best(classifier.score(crop), BRANDS, NEGATIVES,
+                                    MARGIN, MIN_CONFIDENCE)
                 color = (0, 215, 255) if verdict.is_supercar else (120, 120, 120)
                 label = (f"{verdict.label} {verdict.confidence:.0%}"
                          if verdict.is_supercar else "car")
