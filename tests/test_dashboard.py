@@ -28,3 +28,10 @@ def test_compose_bars_match_middle_width_with_thumbs():
 
 def test_modes_cover_all_number_keys():
     assert set(dashboard.MODE_KEYS.values()) == set(dashboard.MODES)
+
+
+def test_run_reads_source_at_call_time_not_import_time():
+    # Guards the bug where `def run(source=SOURCE)` froze SOURCE at import time,
+    # so `dashboard.SOURCE = 1` was ignored. The default MUST be None.
+    import inspect
+    assert inspect.signature(dashboard.run).parameters["source"].default is None

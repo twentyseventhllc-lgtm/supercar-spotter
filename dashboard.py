@@ -162,7 +162,11 @@ def _process_frame(result, mode, classifier, tracker, state):
     return annotated
 
 
-def run(source=SOURCE, display=None, max_frames=None):
+def run(source=None, display=None, max_frames=None):
+    # Read the module-level SOURCE at call time (not as a default arg, which
+    # would freeze it at import time and ignore `dashboard.SOURCE = ...`).
+    if source is None:
+        source = SOURCE
     classifier = BrandClassifier(labels=LABELS)
     tracker = CatchTracker()
     mode = "supercars"
