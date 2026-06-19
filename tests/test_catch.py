@@ -35,3 +35,34 @@ def test_reset_clears_state():
     t.update(1, sc(0.6))
     t.reset()
     assert t.update(1, sc(0.6)) is not None  # track 1 is fresh again
+
+
+def test_streak_required_before_catching():
+    t = CatchTracker(confirm_streak=3)
+    assert t.update(1, sc(0.6)) is None          # streak 1
+    assert t.update(1, sc(0.7)) is None           # streak 2
+    assert t.update(1, sc(0.8)) == CatchAction(track_id=1, label="Ferrari", confidence=0.8)
+
+
+def test_different_brand_resets_streak():
+    t = CatchTracker(confirm_streak=2)
+    other = Verdict(label="Lamborghini", confidence=0.9, is_supercar=True)
+    assert t.update(1, sc(0.7)) is None           # Ferrari streak 1
+    assert t.update(1, other) is None             # switch -> Lambo streak 1 (reset)
+    assert t.update(1, other) == CatchAction(track_id=1, label="Lamborghini", confidence=0.9)
+
+
+def test_non_supercar_resets_streak():
+    t = CatchTracker(confirm_streak=2)
+    assert t.update(1, sc(0.7)) is None           # streak 1
+    assert t.update(1, normie(0.9)) is None       # reset
+    assert t.update(1, sc(0.7)) is None           # streak 1 again, not caught
+
+
+def test_cached_verdict_does_not_advance_streak():
+    t = CatchTracker(confirm_streak=3)
+    assert t.update(1, sc(0.6), fresh=True) is None   # streak 1
+    assert t.update(1, sc(0.6), fresh=False) is None  # cached, no advance
+    assert t.update(1, sc(0.6), fresh=False) is None  # cached, no advance
+    assert t.update(1, sc(0.7), fresh=True) is None   # streak 2
+    assert t.update(1, sc(0.8), fresh=True) is not None  # streak 3 -> catch
