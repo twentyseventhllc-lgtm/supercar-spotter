@@ -6,13 +6,14 @@ from dataclasses import dataclass
 class Verdict:
     label: str
     confidence: float
-    is_supercar: bool
+    is_exotic: bool       # beats the best "ordinary car" score by `margin`
+    is_identified: bool   # is_exotic AND confidence >= identify_floor
 
 
-def pick_best(scores, brands, negatives, margin, min_confidence=0.0):
+def pick_best(scores, brands, negatives, margin, identify_floor=0.0):
     brand_scores = {label: scores[label] for label in brands if label in scores}
     if not brand_scores:
-        return Verdict(label="", confidence=0.0, is_supercar=False)
+        return Verdict(label="", confidence=0.0, is_exotic=False, is_identified=False)
 
     best_label = max(brand_scores, key=brand_scores.get)
     best_brand = brand_scores[best_label]
@@ -20,14 +21,10 @@ def pick_best(scores, brands, negatives, margin, min_confidence=0.0):
     neg_scores = [scores[label] for label in negatives if label in scores]
     best_neg = max(neg_scores) if neg_scores else 0.0
 
-    # A catch needs BOTH: it beats the best "ordinary car" score by `margin`,
-    # AND its absolute brand confidence clears `min_confidence`. The floor is
-    # what kills weak ~50-60% guesses on blurry/ambiguous cars while letting a
-    # distinctive supercar (which scores ~0.9+) through.
-    beats_margin = (best_brand - best_neg) >= margin
-    clears_floor = best_brand >= min_confidence
-    is_supercar = beats_margin and clears_floor
-    return Verdict(label=best_label, confidence=best_brand, is_supercar=is_supercar)
+    is_exotic = (best_brand - best_neg) >= margin
+    is_identified = is_exotic and best_brand >= identify_floor
+    return Verdict(label=best_label, confidence=best_brand,
+                   is_exotic=is_exotic, is_identified=is_identified)
 
 
 class BrandClassifier:
