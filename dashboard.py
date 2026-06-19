@@ -24,7 +24,8 @@ from brain import BrandClassifier, pick_best
 from catch import CatchTracker
 from notify import notify_catch
 from spotter import (BRANDS, NEGATIVES, MARGIN, IDENTIFY_FLOOR, CONFIRM_STREAK,
-                     MIN_BOX_AREA, CONF, OUT_DIR, save_catch, list_sources)
+                     SAVE_ALL_CARS, MIN_BOX_AREA, CONF, OUT_DIR,
+                     save_catch, save_all_car, list_sources)
 
 # ─── config ───────────────────────────────────────────────────
 SOURCE  = 0          # webcam index, a clip path, or a folder of clips
@@ -69,8 +70,9 @@ def _draw_box(img, x1, y1, x2, y2, label, color):
 def _make_hud(width, info):
     bar = np.full((HUD_H, width, 3), 18, np.uint8)
     cv2.putText(bar, "SUPERCAR SPOTTER", (14, 30), FONT, 0.85, GOLD, 2)
-    stats = (f"MODE {info['mode'].upper()}     CATCHES {info['catches']}"
-             f"     FPS {info['fps']:.0f}     LAST {info['last'] or '-'}")
+    stats = (f"MODE {info['mode'].upper()}     IDENTIFIED {info['identified']}"
+             f"     UNKNOWN {info['unidentified']}     FPS {info['fps']:.0f}"
+             f"     LAST {info['last'] or '-'}")
     cv2.putText(bar, stats, (260, 30), FONT, 0.62, WHITE, 2)
     cv2.putText(bar, "[1] supercars   [2] all   [3] people   [4] cars   [q] quit",
                 (14, 58), FONT, 0.55, GREY, 1)
@@ -82,13 +84,14 @@ def _make_gallery(width, thumbs):
     cv2.putText(bar, "CAUGHT", (14, 18), FONT, 0.5, GOLD, 1)
     th = GALLERY_H - 40
     x = 14
-    for thumb, brand in thumbs[::-1]:          # newest first, left to right
+    for thumb, label, tier in thumbs[::-1]:        # newest first, left to right
         if x + THUMB_W > width:
             break
+        color = GOLD if tier == "identified" else CYAN
         cell = cv2.resize(thumb, (THUMB_W, th))
         bar[26:26 + th, x:x + THUMB_W] = cell
-        cv2.rectangle(bar, (x, 26), (x + THUMB_W, 26 + th), GOLD, 2)
-        cv2.putText(bar, brand[:16], (x + 2, GALLERY_H - 8), FONT, 0.45, GOLD, 1)
+        cv2.rectangle(bar, (x, 26), (x + THUMB_W, 26 + th), color, 2)
+        cv2.putText(bar, label[:16], (x + 2, GALLERY_H - 8), FONT, 0.45, color, 1)
         x += THUMB_W + 10
     if not thumbs:
         cv2.putText(bar, "no supercars caught yet", (14, 70), FONT, 0.6, GREY, 1)
@@ -166,20 +169,27 @@ def _process_frame(result, mode, classifier, tracker, state):
             verdict = cache[tid][0]
             fresh = False
 
-        if verdict.is_supercar:
+        if verdict.is_identified:
             _draw_box(annotated, x1, y1, x2, y2,
                       f"{verdict.label} {verdict.confidence:.0%}", GOLD)
+        elif verdict.is_exotic:
+            _draw_box(annotated, x1, y1, x2, y2, "exotic?", CYAN)
         else:
             _draw_box(annotated, x1, y1, x2, y2, "car", GREY)
+
+        if SAVE_ALL_CARS and tid not in state["all_seen"]:
+            state["all_seen"].add(tid)
+            save_all_car(OUT_DIR, crop, tid)
 
         action = tracker.update(tid, verdict, fresh=fresh)
         if action is not None:
             path = save_catch(OUT_DIR, annotated, action)
-            state["caught_ids"].add(tid)
+            bucket = "ident_ids" if action.tier == "identified" else "unident_ids"
+            state[bucket].add(tid)
             state["last"] = action.label
-            state["thumbs"].append((crop.copy(), action.label))
+            state["thumbs"].append((crop.copy(), action.label, action.tier))
             state["thumbs"] = state["thumbs"][-12:]
-            notify_catch(action, path)   # one phone push per car (self-throttled)
+            notify_catch(action, path)
 
     return annotated
 
@@ -192,14 +202,15 @@ def run(source=None, display=None, max_frames=None):
     classifier = BrandClassifier(labels=LABELS)
     tracker = CatchTracker(confirm_streak=CONFIRM_STREAK)
     mode = "supercars"
-    state = {"caught_ids": set(), "thumbs": [], "last": None,
-             "frame_no": 0, "verdict_cache": {}}
+    state = {"ident_ids": set(), "unident_ids": set(), "thumbs": [], "last": None,
+             "frame_no": 0, "verdict_cache": {}, "all_seen": set()}
     fps, prev = 0.0, time.time()
     seen = 0
 
     for src in list_sources(source):
         tracker.reset()
-        state["verdict_cache"].clear()   # fresh track ids per clip
+        state["verdict_cache"].clear()
+        state["all_seen"].clear()
         model = YOLO("yolo11n.pt")
         # No `classes=` filter: detect everything so modes can switch live.
         try:
@@ -213,7 +224,9 @@ def run(source=None, display=None, max_frames=None):
                 prev = now
                 if dt > 0:
                     fps = 0.9 * fps + 0.1 * (1.0 / dt)
-                info = {"mode": mode, "catches": len(state["caught_ids"]),
+                info = {"mode": mode,
+                        "identified": len(state["ident_ids"]),
+                        "unidentified": len(state["unident_ids"]),
                         "fps": fps, "last": state["last"]}
                 composite = _compose(result.orig_img, annotated, info, state["thumbs"])
 
