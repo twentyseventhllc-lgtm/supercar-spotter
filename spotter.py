@@ -5,7 +5,8 @@ BRANDS     = ["Ferrari", "Lamborghini", "Porsche", "McLaren", "Lotus",
               "Aston Martin", "Bugatti", "Maserati", "Audi R8", "Corvette"]
 NEGATIVES  = ["ordinary car", "sedan", "SUV", "van", "truck"]
 MARGIN     = 0.15      # how much a brand must beat the best normie score to count
-MIN_CONFIDENCE = 0.70  # absolute brand confidence floor; kills weak/blurry false alarms
+MIN_CONFIDENCE = 0.85  # absolute brand confidence floor; kills weak/blurry false alarms
+CONFIRM_STREAK = 3     # a car must be the SAME supercar this many checks before it counts
 MIN_BOX_AREA = 4000    # px²; skip tiny far-away cars
 CONF       = 0.30      # YOLO detection confidence floor
 CAR_CLASSES = [2]      # COCO 'car'
@@ -55,7 +56,7 @@ def save_catch(out_dir, frame, action):
 
 def run():
     classifier = BrandClassifier(labels=LABELS)
-    tracker = CatchTracker()
+    tracker = CatchTracker(confirm_streak=CONFIRM_STREAK)
 
     for src in list_sources(SOURCE):
         tracker.reset()  # fresh track IDs per clip

@@ -31,6 +31,7 @@ SOURCE  = 0          # webcam index, a clip path, or a folder of clips
 PANE_H  = 380        # on-screen height of each feed pane (px)
 CLASSIFY_EVERY = 6   # supercars mode: re-run CLIP on a tracked car every N frames
                      # (reuse the last verdict between) — higher = faster, laggier labels
+CONFIRM_STREAK = 3   # a car must be the SAME supercar this many fresh checks before it counts
 # ──────────────────────────────────────────────────────────────
 
 CAR_CLASS = 2
@@ -159,8 +160,10 @@ def _process_frame(result, mode, classifier, tracker, state):
             verdict = pick_best(classifier.score(crop), BRANDS, NEGATIVES,
                                 MARGIN, MIN_CONFIDENCE)
             cache[tid] = (verdict, state["frame_no"])
+            fresh = True
         else:
             verdict = cache[tid][0]
+            fresh = False
 
         if verdict.is_supercar:
             _draw_box(annotated, x1, y1, x2, y2,
@@ -168,7 +171,7 @@ def _process_frame(result, mode, classifier, tracker, state):
         else:
             _draw_box(annotated, x1, y1, x2, y2, "car", GREY)
 
-        action = tracker.update(tid, verdict)
+        action = tracker.update(tid, verdict, fresh=fresh)
         if action is not None:
             path = save_catch(OUT_DIR, annotated, action)
             state["caught_ids"].add(tid)
@@ -186,7 +189,7 @@ def run(source=None, display=None, max_frames=None):
     if source is None:
         source = SOURCE
     classifier = BrandClassifier(labels=LABELS)
-    tracker = CatchTracker()
+    tracker = CatchTracker(confirm_streak=CONFIRM_STREAK)
     mode = "supercars"
     state = {"caught_ids": set(), "thumbs": [], "last": None,
              "frame_no": 0, "verdict_cache": {}}
