@@ -5,9 +5,9 @@ BRANDS     = ["Ferrari", "Lamborghini", "Porsche", "McLaren", "Lotus",
               "Aston Martin", "Bugatti", "Maserati", "Audi R8", "Corvette"]
 NEGATIVES  = ["ordinary car", "sedan", "SUV", "van", "truck"]
 MARGIN     = 0.15      # how much a brand must beat the best normie score to count
-MIN_CONFIDENCE = 0.75  # absolute brand confidence floor; kills weak/blurry false alarms
-CONFIRM_STREAK = 2     # a car must be the SAME supercar this many checks before it counts
-                       # (set to 1 to catch on the first qualifying frame — most lenient)
+IDENTIFY_FLOOR = 0.75  # confidence to NAME a brand; below this an exotic car is "unidentified"
+CONFIRM_STREAK = 2     # consecutive exotic checks before a car counts (set 1 = most lenient)
+SAVE_ALL_CARS = True   # also save every car to catches/all/ as a safety net
 MIN_BOX_AREA = 4000    # px²; skip tiny far-away cars
 CONF       = 0.30      # YOLO detection confidence floor
 CAR_CLASSES = [2]      # COCO 'car'
@@ -67,9 +67,11 @@ def save_all_car(out_dir, crop, track_id):
 def run():
     classifier = BrandClassifier(labels=LABELS)
     tracker = CatchTracker(confirm_streak=CONFIRM_STREAK)
+    all_seen = set()
 
     for src in list_sources(SOURCE):
         tracker.reset()  # fresh track IDs per clip
+        all_seen.clear()
         model = YOLO("yolo11n.pt")
         stream = model.track(source=src, classes=CAR_CLASSES, conf=CONF,
                              persist=True, stream=True, verbose=False)
@@ -90,13 +92,23 @@ def run():
                     continue
 
                 verdict = pick_best(classifier.score(crop), BRANDS, NEGATIVES,
-                                    MARGIN, MIN_CONFIDENCE)
-                color = (0, 215, 255) if verdict.is_supercar else (120, 120, 120)
-                label = (f"{verdict.label} {verdict.confidence:.0%}"
-                         if verdict.is_supercar else "car")
+                                    MARGIN, IDENTIFY_FLOOR)
+                if verdict.is_identified:
+                    color = (0, 215, 255)
+                    label = f"{verdict.label} {verdict.confidence:.0%}"
+                elif verdict.is_exotic:
+                    color = (255, 200, 0)
+                    label = "exotic?"
+                else:
+                    color = (120, 120, 120)
+                    label = "car"
                 cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
                 cv2.putText(frame, label, (x1, max(0, y1 - 8)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+                if SAVE_ALL_CARS and tid not in all_seen:
+                    all_seen.add(tid)
+                    save_all_car(OUT_DIR, crop, tid)
 
                 action = tracker.update(tid, verdict)
                 if action is not None:

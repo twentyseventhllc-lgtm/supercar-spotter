@@ -23,7 +23,7 @@ from ultralytics import YOLO
 from brain import BrandClassifier, pick_best
 from catch import CatchTracker
 from notify import notify_catch
-from spotter import (BRANDS, NEGATIVES, MARGIN, MIN_CONFIDENCE, CONFIRM_STREAK,
+from spotter import (BRANDS, NEGATIVES, MARGIN, IDENTIFY_FLOOR, CONFIRM_STREAK,
                      MIN_BOX_AREA, CONF, OUT_DIR, save_catch, list_sources)
 
 # ─── config ───────────────────────────────────────────────────
@@ -159,7 +159,7 @@ def _process_frame(result, mode, classifier, tracker, state):
         cache = state["verdict_cache"]
         if _due_for_classify(cache, tid, state["frame_no"], CLASSIFY_EVERY):
             verdict = pick_best(classifier.score(crop), BRANDS, NEGATIVES,
-                                MARGIN, MIN_CONFIDENCE)
+                                MARGIN, IDENTIFY_FLOOR)
             cache[tid] = (verdict, state["frame_no"])
             fresh = True
         else:
