@@ -57,8 +57,12 @@ def test_save_catch_names_file_and_logs_tier(tmp_path):
     spotter.save_catch(str(tmp_path), frame, action)
     jpgs = list(tmp_path.glob("*.jpg"))
     assert len(jpgs) == 1 and "track7" in jpgs[0].name and "Ferrari" in jpgs[0].name
-    row = (tmp_path / "log.csv").read_text().strip().split(",")
-    assert "identified" in row and "Ferrari" in row and "7" in row
+    import csv
+    with open(tmp_path / "log.csv", newline="") as fh:
+        row = next(csv.reader(fh))
+    assert row[1] == "7"                 # track_id
+    assert row[2] == "identified"        # tier column
+    assert row[3] == "Ferrari"           # label column
 
 def test_save_all_car_writes_to_all_subfolder(tmp_path):
     import numpy as np

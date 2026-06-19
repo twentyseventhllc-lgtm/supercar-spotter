@@ -185,7 +185,9 @@ def _process_frame(result, mode, classifier, tracker, state):
         if action is not None:
             path = save_catch(OUT_DIR, annotated, action)
             bucket = "ident_ids" if action.tier == "identified" else "unident_ids"
+            other = "unident_ids" if action.tier == "identified" else "ident_ids"
             state[bucket].add(tid)
+            state[other].discard(tid)   # an upgraded car moves buckets, not double-counted
             state["last"] = action.label
             state["thumbs"].append((crop.copy(), action.label, action.tier))
             state["thumbs"] = state["thumbs"][-12:]
