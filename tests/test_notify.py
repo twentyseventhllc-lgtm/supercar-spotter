@@ -32,13 +32,13 @@ def test_notify_catch_pushes_once_per_track(monkeypatch):
     monkeypatch.setattr(notify, "ntfy_photo",
                         lambda topic, title, msg, path: sent.append((title, path)))
 
-    action = CatchAction(track_id=7, label="Lamborghini", confidence=0.94)
+    action = CatchAction(track_id=7, label="Lamborghini", confidence=0.94, tier="identified")
     assert notify.notify_catch(action, "catches/a.jpg") is True
     # same track again (e.g. a higher-confidence frame) must NOT push again
-    better = CatchAction(track_id=7, label="Lamborghini", confidence=0.99)
+    better = CatchAction(track_id=7, label="Lamborghini", confidence=0.99, tier="identified")
     assert notify.notify_catch(better, "catches/b.jpg") is False
     # a different car does push
-    other = CatchAction(track_id=8, label="Porsche", confidence=0.80)
+    other = CatchAction(track_id=8, label="Porsche", confidence=0.80, tier="identified")
     assert notify.notify_catch(other, "catches/c.jpg") is True
 
     assert sent == [("Lamborghini 94%", "catches/a.jpg"),
@@ -58,8 +58,8 @@ def test_notify_catch_rate_limited_by_cooldown(monkeypatch):
     monkeypatch.setattr(notify, "ntfy_photo",
                         lambda topic, title, msg, path: sent.append(title))
 
-    first = CatchAction(track_id=7, label="Lamborghini", confidence=0.94)
-    later = CatchAction(track_id=8, label="Porsche", confidence=0.80)
+    first = CatchAction(track_id=7, label="Lamborghini", confidence=0.94, tier="identified")
+    later = CatchAction(track_id=8, label="Porsche", confidence=0.80, tier="identified")
     assert notify.notify_catch(first, "a.jpg", now=0) is True     # first push
     assert notify.notify_catch(later, "b.jpg", now=10) is False   # within cooldown -> dropped
     assert notify.notify_catch(later, "b.jpg", now=70) is True    # cooldown cleared -> sends
@@ -88,7 +88,7 @@ def test_notify_catch_noop_when_disabled(monkeypatch):
     calls = []
     monkeypatch.setattr(notify, "ntfy_photo",
                         lambda *a, **k: calls.append(a))
-    action = CatchAction(track_id=1, label="Ferrari", confidence=0.9)
+    action = CatchAction(track_id=1, label="Ferrari", confidence=0.9, tier="identified")
     assert notify.notify_catch(action, "catches/x.jpg") is False
     assert calls == []
 
@@ -99,6 +99,6 @@ def test_notify_catch_noop_when_no_image(monkeypatch):
     monkeypatch.setattr(notify, "NTFY_TOPIC", "t")
     calls = []
     monkeypatch.setattr(notify, "ntfy_photo", lambda *a, **k: calls.append(a))
-    action = CatchAction(track_id=1, label="Ferrari", confidence=0.9)
+    action = CatchAction(track_id=1, label="Ferrari", confidence=0.9, tier="identified")
     assert notify.notify_catch(action, None) is False
     assert calls == []

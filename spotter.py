@@ -49,9 +49,18 @@ def save_catch(out_dir, frame, action):
     path = os.path.join(out_dir, f"{ts}_track{action.track_id}_{safe_label}.jpg")
     cv2.imwrite(path, frame)
     with open(os.path.join(out_dir, "log.csv"), "a", newline="") as fh:
-        csv.writer(fh).writerow([ts, action.track_id, action.label,
+        csv.writer(fh).writerow([ts, action.track_id, action.tier, action.label,
                                  f"{action.confidence:.3f}", path])
-    print(f"📸 caught {action.label} ({action.confidence:.0%}) → {path}")
+    print(f"📸 caught [{action.tier}] {action.label} ({action.confidence:.0%}) → {path}")
+    return path
+
+
+def save_all_car(out_dir, crop, track_id):
+    all_dir = os.path.join(out_dir, "all")
+    os.makedirs(all_dir, exist_ok=True)
+    ts = time.strftime("%Y%m%d-%H%M%S")
+    path = os.path.join(all_dir, f"{ts}_track{track_id}_car.jpg")
+    cv2.imwrite(path, crop)
     return path
 
 

@@ -89,7 +89,10 @@ def notify_catch(action, image_path, now=None):
         return False              # cooldown: drop WITHOUT marking — may push later
     _notified.add(action.track_id)
     _last_push_ts = t
-    title = f"{action.label} {action.confidence:.0%}"
+    if action.tier == "identified":
+        title = f"{action.label} {action.confidence:.0%}"
+    else:
+        title = "Unidentified exotic"
     try:
         ntfy_photo(NTFY_TOPIC, title, "Supercar Spotter caught one!", image_path)
         print(f"📲 pushed {title} to your phone")
