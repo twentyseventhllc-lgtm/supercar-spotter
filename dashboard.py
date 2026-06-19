@@ -178,33 +178,42 @@ def run(source=None, display=None, max_frames=None):
         tracker.reset()
         model = YOLO("yolo11n.pt")
         # No `classes=` filter: detect everything so modes can switch live.
-        for result in model.track(source=src, conf=CONF, persist=True,
-                                  stream=True, verbose=False):
-            annotated = _process_frame(result, mode, classifier, tracker, state)
+        try:
+            stream = model.track(source=src, conf=CONF, persist=True,
+                                 stream=True, verbose=False)
+            for result in stream:
+                annotated = _process_frame(result, mode, classifier, tracker, state)
 
-            now = time.time()
-            dt = now - prev
-            prev = now
-            if dt > 0:
-                fps = 0.9 * fps + 0.1 * (1.0 / dt)
-            info = {"mode": mode, "catches": len(state["caught_ids"]),
-                    "fps": fps, "last": state["last"]}
-            composite = _compose(result.orig_img, annotated, info, state["thumbs"])
+                now = time.time()
+                dt = now - prev
+                prev = now
+                if dt > 0:
+                    fps = 0.9 * fps + 0.1 * (1.0 / dt)
+                info = {"mode": mode, "catches": len(state["caught_ids"]),
+                        "fps": fps, "last": state["last"]}
+                composite = _compose(result.orig_img, annotated, info, state["thumbs"])
 
-            seen += 1
-            if display is not None:
-                if display(composite, {**info, "frame": seen}) is False:
+                seen += 1
+                if display is not None:
+                    if display(composite, {**info, "frame": seen}) is False:
+                        return
+                else:
+                    cv2.imshow("Supercar Spotter — Live", composite)
+                    key = cv2.waitKey(1) & 0xFF
+                    if key == ord("q"):
+                        cv2.destroyAllWindows()
+                        return
+                    if key in MODE_KEYS:
+                        mode = MODE_KEYS[key]
+                if max_frames and seen >= max_frames:
                     return
-            else:
-                cv2.imshow("Supercar Spotter — Live", composite)
-                key = cv2.waitKey(1) & 0xFF
-                if key == ord("q"):
-                    cv2.destroyAllWindows()
-                    return
-                if key in MODE_KEYS:
-                    mode = MODE_KEYS[key]
-            if max_frames and seen >= max_frames:
-                return
+        except (ConnectionError, cv2.error) as e:
+            print(f"\n⚠️  Lost the camera/source {src!r}.\n   {e}\n"
+                  "   • Valid indexes on this Mac: run  pick_camera.py  to list them.\n"
+                  "   • iPhone (Continuity Camera) must be MOUNTED, LOCKED and STILL —\n"
+                  "     if it connects then drops after ~2s, OpenCV can't hold it.\n"
+                  "   • Most reliable: record a clip on your phone and point SOURCE at the file.")
+            continue
 
     if display is None:
         cv2.destroyAllWindows()
