@@ -5,8 +5,9 @@ BRANDS     = ["Ferrari", "Lamborghini", "Porsche", "McLaren", "Lotus",
               "Aston Martin", "Bugatti", "Maserati", "Audi R8", "Corvette"]
 NEGATIVES  = ["ordinary car", "sedan", "SUV", "van", "truck"]
 MARGIN     = 0.15      # how much a brand must beat the best normie score to count
-MIN_CONFIDENCE = 0.85  # absolute brand confidence floor; kills weak/blurry false alarms
-CONFIRM_STREAK = 3     # a car must be the SAME supercar this many checks before it counts
+MIN_CONFIDENCE = 0.75  # absolute brand confidence floor; kills weak/blurry false alarms
+CONFIRM_STREAK = 2     # a car must be the SAME supercar this many checks before it counts
+                       # (set to 1 to catch on the first qualifying frame — most lenient)
 MIN_BOX_AREA = 4000    # px²; skip tiny far-away cars
 CONF       = 0.30      # YOLO detection confidence floor
 CAR_CLASSES = [2]      # COCO 'car'

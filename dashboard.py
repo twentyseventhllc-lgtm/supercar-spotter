@@ -23,15 +23,16 @@ from ultralytics import YOLO
 from brain import BrandClassifier, pick_best
 from catch import CatchTracker
 from notify import notify_catch
-from spotter import (BRANDS, NEGATIVES, MARGIN, MIN_CONFIDENCE,
+from spotter import (BRANDS, NEGATIVES, MARGIN, MIN_CONFIDENCE, CONFIRM_STREAK,
                      MIN_BOX_AREA, CONF, OUT_DIR, save_catch, list_sources)
 
 # ─── config ───────────────────────────────────────────────────
 SOURCE  = 0          # webcam index, a clip path, or a folder of clips
 PANE_H  = 380        # on-screen height of each feed pane (px)
-CLASSIFY_EVERY = 6   # supercars mode: re-run CLIP on a tracked car every N frames
-                     # (reuse the last verdict between) — higher = faster, laggier labels
-CONFIRM_STREAK = 3   # a car must be the SAME supercar this many fresh checks before it counts
+CLASSIFY_EVERY = 3   # supercars mode: re-run CLIP on a tracked car every N frames
+                     # (reuse the last verdict between). Lower = streak reached sooner
+                     # on short/fragmented tracks; higher = faster but laggier labels.
+# CONFIRM_STREAK is imported from spotter.py (single source of truth)
 # ──────────────────────────────────────────────────────────────
 
 CAR_CLASS = 2

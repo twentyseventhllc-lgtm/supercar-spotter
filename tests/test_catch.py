@@ -7,6 +7,20 @@ def sc(conf):       # a supercar verdict
 def normie(conf):   # a non-supercar verdict
     return Verdict(label="Ferrari", confidence=conf, is_supercar=False)
 
+def test_short_track_catches_at_streak_2_not_3():
+    # Regression: on an unstable feed YOLO fragments a car into short-lived track
+    # ids. A track that gets only 2 fresh agreeing supercar verdicts before it is
+    # re-id'd NEVER catches at confirm_streak=3 (the "detects nothing" bug) but
+    # does at confirm_streak=2 — which is why the live default was relaxed to 2.
+    strict = CatchTracker(confirm_streak=3)
+    assert strict.update(1, sc(0.9)) is None
+    assert strict.update(1, sc(0.9)) is None      # only 2 checks -> never caught at 3
+
+    relaxed = CatchTracker(confirm_streak=2)
+    assert relaxed.update(1, sc(0.9)) is None
+    assert relaxed.update(1, sc(0.9)) is not None  # caught on the 2nd check
+
+
 def test_normie_never_catches():
     t = CatchTracker()
     assert t.update(1, normie(0.9)) is None
