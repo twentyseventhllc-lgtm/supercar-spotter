@@ -30,6 +30,17 @@ def test_modes_cover_all_number_keys():
     assert set(dashboard.MODE_KEYS.values()) == set(dashboard.MODES)
 
 
+def test_due_for_classify_throttles_per_track():
+    cache = {}
+    # never classified -> due
+    assert dashboard._due_for_classify(cache, 7, frame_no=0, every=6) is True
+    cache[7] = ("verdict", 0)            # just classified at frame 0
+    assert dashboard._due_for_classify(cache, 7, frame_no=3, every=6) is False
+    assert dashboard._due_for_classify(cache, 7, frame_no=6, every=6) is True
+    # a different car is always due the first time
+    assert dashboard._due_for_classify(cache, 8, frame_no=3, every=6) is True
+
+
 def test_run_reads_source_at_call_time_not_import_time():
     # Guards the bug where `def run(source=SOURCE)` froze SOURCE at import time,
     # so `dashboard.SOURCE = 1` was ignored. The default MUST be None.

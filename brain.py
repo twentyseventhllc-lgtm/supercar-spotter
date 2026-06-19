@@ -40,19 +40,51 @@ class BrandClassifier:
 
         self._torch = torch
         self.labels = list(labels)
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.model, _, self.preprocess = open_clip.create_model_and_transforms(
             model_name, pretrained=pretrained
         )
-        self.model = self.model.to(self.device).eval()
+        self.model = self.model.eval()
         tokenizer = open_clip.get_tokenizer(model_name)
-
         prompts = [template.format(label) for label in self.labels]
-        tokens = tokenizer(prompts).to(self.device)
+        self._tokens = tokenizer(prompts)
+
+        # Prefer GPU (CUDA, or Apple Silicon's MPS/Metal) — CLIP on CPU is the
+        # FPS bottleneck. If the accelerated path errors at all, fall back to CPU
+        # so a quirky backend can never crash the run.
+        for device in self._candidate_devices(torch):
+            try:
+                self._activate(device)
+                self.device = device
+                break
+            except Exception as exc:                  # noqa: BLE001
+                if device == "cpu":
+                    raise
+                print(f"({device} unavailable for CLIP: {exc}; falling back)")
+
+    @staticmethod
+    def _candidate_devices(torch):
+        devices = []
+        if torch.cuda.is_available():
+            devices.append("cuda")
+        mps = getattr(torch.backends, "mps", None)
+        if mps is not None and mps.is_available():
+            devices.append("mps")
+        devices.append("cpu")
+        return devices
+
+    def _activate(self, device):
+        """Move the model to `device` and warm up both encoders — if the backend
+        can't run them, this raises here (during init) instead of mid-stream."""
+        torch = self._torch
+        from PIL import Image
+
+        self.model = self.model.to(device)
         with torch.no_grad():
-            text_features = self.model.encode_text(tokens)
+            text_features = self.model.encode_text(self._tokens.to(device))
             text_features /= text_features.norm(dim=-1, keepdim=True)
+            warm = self.preprocess(Image.new("RGB", (64, 64))).unsqueeze(0).to(device)
+            self.model.encode_image(warm)            # exercise the image path too
         self._text_features = text_features
 
     def score(self, crop_bgr):

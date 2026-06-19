@@ -29,6 +29,8 @@ from spotter import (BRANDS, NEGATIVES, MARGIN, MIN_CONFIDENCE,
 # ─── config ───────────────────────────────────────────────────
 SOURCE  = 0          # webcam index, a clip path, or a folder of clips
 PANE_H  = 380        # on-screen height of each feed pane (px)
+CLASSIFY_EVERY = 6   # supercars mode: re-run CLIP on a tracked car every N frames
+                     # (reuse the last verdict between) — higher = faster, laggier labels
 # ──────────────────────────────────────────────────────────────
 
 CAR_CLASS = 2
@@ -113,12 +115,20 @@ def _iter_dets(result):
         yield x1, y1, x2, y2, cls_id, tid
 
 
+def _due_for_classify(cache, tid, frame_no, every):
+    """True if this track should be (re-)scored by CLIP now. Between re-scores we
+    reuse the cached verdict, so CLIP runs ~1/every as often (the FPS win)."""
+    last = cache.get(tid)
+    return last is None or (frame_no - last[1]) >= every
+
+
 def _process_frame(result, mode, classifier, tracker, state):
     """Draw detections for the current mode onto a copy of the frame; run catch
     logic in supercars mode. Returns the annotated frame."""
     raw = result.orig_img
     annotated = raw.copy()
     names = result.names
+    state["frame_no"] += 1
 
     for x1, y1, x2, y2, cls_id, tid in _iter_dets(result):
         if mode == "people":
@@ -136,22 +146,28 @@ def _process_frame(result, mode, classifier, tracker, state):
         # mode == "supercars": only cars, brand-scored by CLIP
         if cls_id != CAR_CLASS:
             continue
-        if (x2 - x1) * (y2 - y1) < MIN_BOX_AREA:
+        if (x2 - x1) * (y2 - y1) < MIN_BOX_AREA or tid is None:
             _draw_box(annotated, x1, y1, x2, y2, "car", GREY)
             continue
         crop = raw[y1:y2, x1:x2]
         if crop.size == 0:
             continue
-        verdict = pick_best(classifier.score(crop), BRANDS, NEGATIVES,
-                            MARGIN, MIN_CONFIDENCE)
+
+        # Only re-run CLIP every CLASSIFY_EVERY frames per car; reuse otherwise.
+        cache = state["verdict_cache"]
+        if _due_for_classify(cache, tid, state["frame_no"], CLASSIFY_EVERY):
+            verdict = pick_best(classifier.score(crop), BRANDS, NEGATIVES,
+                                MARGIN, MIN_CONFIDENCE)
+            cache[tid] = (verdict, state["frame_no"])
+        else:
+            verdict = cache[tid][0]
+
         if verdict.is_supercar:
             _draw_box(annotated, x1, y1, x2, y2,
                       f"{verdict.label} {verdict.confidence:.0%}", GOLD)
         else:
             _draw_box(annotated, x1, y1, x2, y2, "car", GREY)
 
-        if tid is None:
-            continue
         action = tracker.update(tid, verdict)
         if action is not None:
             path = save_catch(OUT_DIR, annotated, action)
@@ -172,12 +188,14 @@ def run(source=None, display=None, max_frames=None):
     classifier = BrandClassifier(labels=LABELS)
     tracker = CatchTracker()
     mode = "supercars"
-    state = {"caught_ids": set(), "thumbs": [], "last": None}
+    state = {"caught_ids": set(), "thumbs": [], "last": None,
+             "frame_no": 0, "verdict_cache": {}}
     fps, prev = 0.0, time.time()
     seen = 0
 
     for src in list_sources(source):
         tracker.reset()
+        state["verdict_cache"].clear()   # fresh track ids per clip
         model = YOLO("yolo11n.pt")
         # No `classes=` filter: detect everything so modes can switch live.
         try:
