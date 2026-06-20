@@ -83,3 +83,23 @@ def test_identify_all_skips_on_query_error(tmp_path):
     # untouched -> not renamed, retried next run
     assert os.path.exists(cat / "a.jpg")
     assert not os.path.exists(cat / "models.csv")
+
+def test_query_gemini_retries_on_429(monkeypatch, tmp_path):
+    import io
+    import urllib.error
+    img = tmp_path / "x.jpg"
+    img.write_bytes(b"\xff\xd8jpeg")
+    monkeypatch.setattr("time.sleep", lambda s: None)        # no real waiting
+    calls = {"n": 0}
+
+    def fake_urlopen(req, timeout=30):
+        calls["n"] += 1
+        if calls["n"] == 1:                                  # first call: rate-limited
+            raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests",
+                                         {"Retry-After": "1"}, None)
+        return io.BytesIO(json.dumps(                         # retry: success
+            {"candidates": [{"content": {"parts": [{"text": "Ferrari 488 GTB"}]}}]}).encode())
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    out = im.query_gemini(str(img), "gemini-2.5-flash", "key")
+    assert out == "Ferrari 488 GTB" and calls["n"] == 2      # retried once, then succeeded
