@@ -38,10 +38,11 @@ def marked_name(path, model):
     return f"{stem}~{safe_model_name(model)}{ext}"
 
 
-def pending_photos(catches_dir, limit):
-    paths = sorted(glob.glob(os.path.join(catches_dir, "*.jpg")) +
-                   glob.glob(os.path.join(catches_dir, "all", "*.jpg")))
-    pending = [p for p in paths if "~" not in os.path.basename(p)]
+def pending_photos(catches_dir, limit, include_all=True):
+    paths = glob.glob(os.path.join(catches_dir, "*.jpg"))           # the cool catches
+    if include_all:
+        paths += glob.glob(os.path.join(catches_dir, "all", "*.jpg"))  # the firehose
+    pending = [p for p in sorted(paths) if "~" not in os.path.basename(p)]
     return pending[:limit]
 
 
@@ -80,7 +81,7 @@ def query_gemini(image_path, model, key):
             raise
 
 
-def identify_all(limit, query=None, catches_dir=CATCHES_DIR, csv_path=None):
+def identify_all(limit, query=None, catches_dir=CATCHES_DIR, csv_path=None, include_all=True):
     csv_path = csv_path or os.path.join(catches_dir, "models.csv")
     if query is None:
         key = _load_api_key()
@@ -89,7 +90,7 @@ def identify_all(limit, query=None, catches_dir=CATCHES_DIR, csv_path=None):
             return
         query = lambda path: query_gemini(path, MODEL, key)
 
-    photos = pending_photos(catches_dir, limit)
+    photos = pending_photos(catches_dir, limit, include_all)
     print(f"Scanning {len(photos)} photo(s)...")
     for i, path in enumerate(photos, 1):
         try:
@@ -119,7 +120,9 @@ if __name__ == "__main__":
     parser.add_argument("--model", default=MODEL, help="Gemini model name")
     parser.add_argument("--delay", type=float, default=RPM_DELAY,
                         help="seconds between calls (lower it if you enable billing/paid tier)")
+    parser.add_argument("--skip-all", action="store_true",
+                        help="only scan the cool catches/, not the big catches/all/ firehose")
     args = parser.parse_args()
     MODEL = args.model
     RPM_DELAY = args.delay
-    identify_all(args.limit)
+    identify_all(args.limit, include_all=not args.skip_all)

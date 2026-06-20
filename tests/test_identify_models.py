@@ -35,6 +35,15 @@ def test_pending_photos_filters_and_limits(tmp_path):
     assert got == {"a_Ferrari.jpg", "b_unidentified.jpg", "d_car.jpg"}
     assert len(im.pending_photos(str(cat), limit=2)) == 2
 
+def test_pending_photos_skip_all(tmp_path):
+    cat = tmp_path / "catches"
+    (cat / "all").mkdir(parents=True)
+    (cat / "a_Ferrari.jpg").write_bytes(b"x")
+    (cat / "all" / "b_car.jpg").write_bytes(b"x")
+    got = {os.path.basename(p) for p in im.pending_photos(str(cat), 100, include_all=False)}
+    assert got == {"a_Ferrari.jpg"}   # catches/all/ skipped
+
+
 def test_load_api_key_env_first(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "env-key")
     assert im._load_api_key() == "env-key"
