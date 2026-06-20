@@ -49,3 +49,53 @@ def _load_api_key(settings_path="~/.gemini/settings.json"):
     if os.path.exists(path):
         return json.load(open(path)).get("GEMINI_API_KEY")
     return None
+
+
+def query_gemini(image_path, model, key):
+    import urllib.request
+    with open(image_path, "rb") as fh:
+        b64 = base64.b64encode(fh.read()).decode()
+    body = json.dumps({"contents": [{"parts": [
+        {"text": PROMPT},
+        {"inline_data": {"mime_type": "image/jpeg", "data": b64}}]}]}).encode()
+    url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+           f"{model}:generateContent?key={key}")
+    req = urllib.request.Request(url, data=body, method="POST",
+                                 headers={"Content-Type": "application/json"})
+    resp = json.load(urllib.request.urlopen(req, timeout=30))
+    return resp["candidates"][0]["content"]["parts"][0]["text"]
+
+
+def identify_all(limit, query=None, catches_dir=CATCHES_DIR, csv_path=None):
+    csv_path = csv_path or os.path.join(catches_dir, "models.csv")
+    if query is None:
+        key = _load_api_key()
+        if not key:
+            print("No GEMINI_API_KEY (env or ~/.gemini/settings.json) — cannot scan.")
+            return
+        query = lambda path: query_gemini(path, MODEL, key)
+
+    photos = pending_photos(catches_dir, limit)
+    print(f"Scanning {len(photos)} photo(s)...")
+    for i, path in enumerate(photos, 1):
+        try:
+            model = parse_model(query(path))
+        except Exception as exc:                       # noqa: BLE001 - never crash the batch
+            print(f"  [{i}/{len(photos)}] {os.path.basename(path)}: {exc} (retry next run)")
+            continue
+        ts = time.strftime("%Y%m%d-%H%M%S")
+        with open(csv_path, "a", newline="") as fh:
+            csv.writer(fh).writerow([ts, os.path.basename(path), model])
+        new_path = marked_name(path, model)
+        os.rename(path, new_path)
+        print(f"  [{i}/{len(photos)}] {model}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Ask Gemini the exact model of caught cars.")
+    parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT,
+                        help="max new photos to scan this run")
+    parser.add_argument("--model", default=MODEL, help="Gemini model name")
+    args = parser.parse_args()
+    MODEL = args.model
+    identify_all(args.limit)
