@@ -1,7 +1,7 @@
 # facecam.py — Face-ID webcam: yellow "WW admin" for the owner, blue "WW unknown" for others.
 # ─── config ───────────────────────────────────────────────────
 SOURCE       = 0          # webcam index
-THRESHOLD    = 0.9        # max face distance to count as the owner (lower = stricter)
+THRESHOLD    = 0.8        # max face distance to count as the owner (lower = stricter)
 TAG          = "WW"       # text drawn on top of every box
 ENROLL_SHOTS = 5          # how many reference shots --enroll captures
 REF_PATH     = "me/embeddings.npy"
@@ -144,7 +144,12 @@ if __name__ == "__main__":
                         help="capture owner reference shots from the webcam")
     parser.add_argument("--enroll-folder", metavar="DIR",
                         help="enroll the owner from a folder of photos")
+    parser.add_argument("--camera", type=int, default=None, metavar="N",
+                        help="camera index to use (e.g. your iPhone via Continuity Camera). "
+                             "Run pick_camera.py to find which index is the phone.")
     args = parser.parse_args()
+    if args.camera is not None:
+        SOURCE = args.camera        # override the default webcam with the chosen index
     if args.enroll_folder:
         enroll_folder(args.enroll_folder)
     elif args.enroll:
