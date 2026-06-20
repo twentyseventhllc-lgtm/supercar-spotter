@@ -9,6 +9,7 @@ PERSON_CONF  = 0.40       # YOLO person-detection confidence floor
 # ──────────────────────────────────────────────────────────────
 
 import argparse
+import os
 
 import cv2
 import numpy as np
@@ -21,6 +22,7 @@ BLUE = (255, 0, 0)
 GREY = (150, 150, 150)
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 PERSON_CLASS = 0
+IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
 
 
 def role_and_color(admin):
@@ -103,8 +105,49 @@ def enroll():
         print("No shots captured — nothing saved.")
 
 
+def _image_files(folder):
+    return sorted(
+        os.path.join(folder, name)
+        for name in os.listdir(folder)
+        if name.lower().endswith(IMAGE_EXTS)
+    )
+
+
+def enroll_folder(folder):
+    """Build the owner reference from a folder of photos (no webcam needed).
+    Keeps the largest face per photo; skips photos with no detectable face."""
+    faceid = FaceID()
+    embeddings, used, skipped = [], 0, 0
+    for path in _image_files(folder):
+        frame = cv2.imread(path)
+        if frame is None:
+            skipped += 1
+            continue
+        faces = faceid.embed_faces(frame)
+        if not faces:
+            skipped += 1
+            print(f"  no face in {os.path.basename(path)}")
+            continue
+        _, emb = max(faces, key=lambda be: (be[0][2] - be[0][0]) * (be[0][3] - be[0][1]))
+        embeddings.append(emb)
+        used += 1
+    if embeddings:
+        save_reference(np.array(embeddings), REF_PATH)
+        print(f"✅ enrolled {used} faces from {folder} (skipped {skipped}) → {REF_PATH}")
+    else:
+        print(f"No faces found in {folder} — nothing saved.")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--enroll", action="store_true", help="capture owner reference shots")
+    parser.add_argument("--enroll", action="store_true",
+                        help="capture owner reference shots from the webcam")
+    parser.add_argument("--enroll-folder", metavar="DIR",
+                        help="enroll the owner from a folder of photos")
     args = parser.parse_args()
-    enroll() if args.enroll else run()
+    if args.enroll_folder:
+        enroll_folder(args.enroll_folder)
+    elif args.enroll:
+        enroll()
+    else:
+        run()
