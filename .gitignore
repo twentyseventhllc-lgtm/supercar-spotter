@@ -16,3 +16,6 @@ clips/
 
 # SDD scratch
 .superpowers/
+
+# Face-ID owner reference
+me/
