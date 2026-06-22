@@ -12,7 +12,7 @@ import urllib.request
 
 # ─── config ───────────────────────────────────────────────────
 ENABLED = True
-NTFY_TOPIC = "supercar-spotter-207d48eb"   # your private channel — subscribe to this
+NTFY_TOPIC = "supercar-spotter-e4729d30547c"   # your private channel — subscribe to this
 NTFY_SERVER = "https://ntfy.sh"
 NOTIFY_COOLDOWN = 60   # min seconds between phone pushes. Without this we fire one
                        # push per catch; a busy street (or false positives) floods
