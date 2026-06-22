@@ -13,3 +13,9 @@ clips/
 
 # OS
 .DS_Store
+
+# SDD scratch
+.superpowers/
+
+# private ntfy topic (keep out of the public repo)
+.ntfy_topic
