@@ -2,7 +2,8 @@
 #
 # Uses ntfy.sh: free, no account. To receive these:
 #   1. Install the "ntfy" app (iOS App Store / Google Play).
-#   2. In the app, Subscribe to the topic in NTFY_TOPIC below.
+#   2. Put your private topic in a one-line `.ntfy_topic` file next to this module
+#      (gitignored, so it stays out of the public repo) and Subscribe to it in the app.
 #   3. Run the spotter — caught cars push straight to your phone.
 #
 # Only the standard library is used (urllib), so there's nothing extra to install.
@@ -12,12 +13,28 @@ import urllib.request
 
 # ─── config ───────────────────────────────────────────────────
 ENABLED = True
-NTFY_TOPIC = "supercar-spotter-e4729d30547c"   # your private channel — subscribe to this
 NTFY_SERVER = "https://ntfy.sh"
 NOTIFY_COOLDOWN = 60   # min seconds between phone pushes. Without this we fire one
                        # push per catch; a busy street (or false positives) floods
                        # ntfy/Apple's push service, which then silently drops them.
 # ──────────────────────────────────────────────────────────────
+
+
+def _load_topic():
+    """Your ntfy topic is kept OUT of this (public) repo. Put it in a one-line
+    gitignored `.ntfy_topic` file next to this module, or set the NTFY_TOPIC env
+    var. Empty (neither set) just means phone notifications are off."""
+    env = os.environ.get("NTFY_TOPIC")
+    if env:
+        return env.strip()
+    path = os.path.join(os.path.dirname(__file__), ".ntfy_topic")
+    if os.path.exists(path):
+        with open(path) as fh:
+            return fh.read().strip()
+    return ""
+
+
+NTFY_TOPIC = _load_topic()
 
 # Track ids already pushed, so one car = one notification (not one per frame).
 _notified = set()
